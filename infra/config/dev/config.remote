@@ -1,0 +1,7 @@
+# dev
+bucket         = "datadeft-tf-dev"
+key            = "state/dev/sensible/terraform.tfstate"
+region         = "eu-west-1"
+dynamodb_table = "datadeft-tf-lock"
+
+
