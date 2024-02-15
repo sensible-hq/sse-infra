@@ -26,6 +26,10 @@ pub async fn broadcast_msg(
     HttpResponse::Ok().body("msg sent")
 }
 
+async fn alb_test() -> impl Responder {
+    HttpResponse::Ok().body("OK")
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let broadcaster = Broadcaster::create();
@@ -37,8 +41,9 @@ async fn main() -> std::io::Result<()> {
             }))
             .route("/events{_:/?}", web::get().to(sse_client))
             .route("/events/{msg}", web::get().to(broadcast_msg))
+            .route("/alb-test", web::get().to(alb_test))
     })
-    .bind(format!("{}:{}", "127.0.0.1", "8000"))?
+    .bind(format!("{}:{}", "0.0.0.0", "8000"))?
     .run()
     .await
 }
