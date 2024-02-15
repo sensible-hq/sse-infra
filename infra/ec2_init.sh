@@ -12,63 +12,12 @@ FILE_BACKEND_EXEC="./backend"
 
 # directory for application
 sudo yum update
-sudo mkdir /opt/apps ||:
+sudo mkdir /opt/apps
 sudo chown -R ssm-user:ssm-user /opt/apps
 cd /opt/apps
 
-
-######### forward port 80 to 8000 locally
-sudo yum install -y iptables
-#sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8000
-#sudo iptables -t nat -I OUTPUT -p tcp -d 127.0.0.1 --dport 80 -j REDIRECT --to-ports 8000
-# check:
-#sudo iptables -t nat --line-numbers -n -L
-# delete:
-#sudo iptables -t nat -D PREROUTING 2
-######### forward port 80 to 8000 locally
-
-
-######### iptable rules are not saved after reboot
-cd /etc/systemd/system
-cat > $FILE_IPTABLES_SERVICE <<- EOM
-[Unit]
-Description=IpTables setter service
-After=syslog.target network.target
-[Service]
-SuccessExitStatus=143
-User=ssm-user
-Group=ssm-user
-
-Type=oneshot
-
-ExecStart=/opt/apps/iptableset
-
-[Install]
-WantedBy=multi-user.target
-EOM
-
-cd /opt/apps
-cat > $FILE_IPTABLES_EXEC <<- EOM
-#!/bin/bash
-
-sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8000
-sudo iptables -t nat -I OUTPUT -p tcp -d 127.0.0.1 --dport 80 -j REDIRECT --to-ports 8000
-EOM
-
-sudo chmod 777 $FILE_IPTABLES_EXEC
-######### iptable rules are not saved after reboot
-
-
-######### run iptables
-sudo systemctl daemon-reload
-sudo systemctl start iptableset.service
-sudo systemctl status iptableset.service
-sudo systemctl enable iptableset.service
-######### run iptables
-
-
 ######### create and run application
-mkdir backend-src ||:
+mkdir backend-src
 cd backend-src
 
 cat > $FILE_CARGO_TOML <<- EOM
@@ -130,7 +79,7 @@ async fn main() -> std::io::Result<()> {
             .route("/events{_:/?}", web::get().to(sse_client))
             .route("/events/{msg}", web::get().to(broadcast_msg))
     })
-    .bind(format!("{}:{}", "127.0.0.1", "8000"))?
+    .bind(format!("{}:{}", "0.0.0.0", "8000"))?
     .run()
     .await
 }
@@ -230,6 +179,7 @@ cd ..
 sudo yum groupinstall -y 'Development Tools'
 curl https://sh.rustup.rs -sSf | sh -s -- -y # no confirm
 # curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# source "$HOME/.cargo/env"
 ######### create and run application
 
 

@@ -46,21 +46,21 @@ resource "aws_security_group" "sg_vpc" {
   name   = "sensible-sg-vpc"
   vpc_id = aws_vpc.vpc.id
   ingress {
-    from_port = 80
-    to_port   = 80
+    from_port = 8000
+    to_port   = 8000
     protocol  = "tcp"
     self      = true
   }
   ingress {
-    from_port       = 80
-    to_port         = 80
+    from_port       = 8000
+    to_port         = 8000
     protocol        = "tcp"
     security_groups = [aws_security_group.sg_alb.id]
   }
   # TODO
   ingress {
-    from_port   = 80
-    to_port     = 80
+    from_port   = 8000
+    to_port     = 8000
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }

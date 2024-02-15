@@ -6,8 +6,6 @@ resource "aws_instance" "ec2" {
   subnet_id              = aws_subnet.public_subnet[0].id
   iam_instance_profile   = aws_iam_instance_profile.instance_profile.name
 
-  key_name = aws_key_pair.ec2_keypair.key_name
-
   tags = {
     Name = "sensible-test"
   }
