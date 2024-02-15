@@ -1,3 +1,275 @@
 #!/bin/bash
 
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# vars
+FILE_MAIN_RS="./main.rs"
+FILE_BROADCAST_RS="./broadcast.rs"
+FILE_CARGO_TOML="./Cargo.toml"
+FILE_IPTABLES_SERVICE="./iptableset.service"
+FILE_IPTABLES_EXEC="./iptableset"
+FILE_BACKEND_SERVICE="./backend.service"
+FILE_BACKEND_EXEC="./backend"
+
+
+# directory for application
+sudo yum update
+sudo mkdir /opt/apps ||:
+sudo chown -R ssm-user:ssm-user /opt/apps
+cd /opt/apps
+
+
+######### forward port 80 to 8000 locally
+sudo yum install -y iptables
+#sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8000
+#sudo iptables -t nat -I OUTPUT -p tcp -d 127.0.0.1 --dport 80 -j REDIRECT --to-ports 8000
+# check:
+#sudo iptables -t nat --line-numbers -n -L
+# delete:
+#sudo iptables -t nat -D PREROUTING 2
+######### forward port 80 to 8000 locally
+
+
+######### iptable rules are not saved after reboot
+cd /etc/systemd/system
+cat > $FILE_IPTABLES_SERVICE <<- EOM
+[Unit]
+Description=IpTables setter service
+After=syslog.target network.target
+[Service]
+SuccessExitStatus=143
+User=ssm-user
+Group=ssm-user
+
+Type=oneshot
+
+ExecStart=/opt/apps/iptableset
+
+[Install]
+WantedBy=multi-user.target
+EOM
+
+cd /opt/apps
+cat > $FILE_IPTABLES_EXEC <<- EOM
+#!/bin/bash
+
+sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8000
+sudo iptables -t nat -I OUTPUT -p tcp -d 127.0.0.1 --dport 80 -j REDIRECT --to-ports 8000
+EOM
+
+sudo chmod 777 $FILE_IPTABLES_EXEC
+######### iptable rules are not saved after reboot
+
+
+######### run iptables
+sudo systemctl daemon-reload
+sudo systemctl start iptableset.service
+sudo systemctl status iptableset.service
+sudo systemctl enable iptableset.service
+######### run iptables
+
+
+######### create and run application
+mkdir backend-src ||:
+cd backend-src
+
+cat > $FILE_CARGO_TOML <<- EOM
+[package]
+name = "actix-sse"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+actix-web = { version = "4.4" }
+actix-web-lab = { version = "0.18" }
+parking_lot = { version = "0.12" }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+EOM
+
+
+mkdir src
+cd src
+
+cat > $FILE_MAIN_RS <<- EOM
+use actix_web::HttpResponse;
+use actix_web::Responder;
+use actix_web::{web, App, HttpServer};
+use actix_web_lab::extract::Path;
+use std::sync::Arc;
+
+use self::broadcast::Broadcaster;
+
+mod broadcast;
+
+pub struct AppState {
+    broadcaster: Arc<Broadcaster>,
+}
+
+// SSE
+pub async fn sse_client(state: web::Data<AppState>) -> impl Responder {
+    println!("in api");
+    state.broadcaster.new_client().await
+}
+
+pub async fn broadcast_msg(
+    state: web::Data<AppState>,
+    Path((msg,)): Path<(String,)>,
+) -> impl Responder {
+    state.broadcaster.broadcast(&msg).await;
+    HttpResponse::Ok().body("msg sent")
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    let broadcaster = Broadcaster::create();
+
+    HttpServer::new(move || {
+        App::new()
+            .app_data(web::Data::new(AppState {
+                broadcaster: Arc::clone(&broadcaster),
+            }))
+            .route("/events{_:/?}", web::get().to(sse_client))
+            .route("/events/{msg}", web::get().to(broadcast_msg))
+    })
+    .bind(format!("{}:{}", "127.0.0.1", "8000"))?
+    .run()
+    .await
+}
+EOM
+
+
+cat > $FILE_BROADCAST_RS <<- EOM
+use std::{sync::Arc, time::Duration};
+use actix_web::rt::time::interval;
+use actix_web_lab::sse::{self, ChannelStream, Sse};
+use futures_util::future;
+use parking_lot::Mutex;
+
+pub struct Broadcaster {
+    inner: Mutex<BroadcasterInner>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct BroadcasterInner {
+    clients: Vec<sse::Sender>,
+}
+
+impl Broadcaster {
+    /// Constructs new broadcaster and spawns ping loop.
+    pub fn create() -> Arc<Self> {
+        let this = Arc::new(Broadcaster {
+            inner: Mutex::new(BroadcasterInner::default()),
+        });
+        Broadcaster::spawn_ping(Arc::clone(&this));
+        // println!("created success");
+
+        this
+    }
+
+    /// Pings clients every 10 seconds to see if they are alive and remove them from the broadcast list if not.
+    fn spawn_ping(this: Arc<Self>) {
+        actix_web::rt::spawn(async move {
+            let mut interval = interval(Duration::from_secs(10));
+
+            loop {
+                interval.tick().await;
+                this.remove_stale_clients().await;
+            }
+        });
+    }
+
+    /// Removes all non-responsive clients from broadcast list.
+    async fn remove_stale_clients(&self) {
+        let clients = self.inner.lock().clients.clone();
+        println!("active client {:?}", clients);
+
+        let mut ok_clients = Vec::new();
+
+        println!("okay active client {:?}", ok_clients);
+
+        for client in clients {
+            if client
+                .send(sse::Event::Comment("ping".into()))
+                .await
+                .is_ok()
+            {
+                ok_clients.push(client.clone());
+            }
+        }
+
+        self.inner.lock().clients = ok_clients;
+    }
+
+    /// Registers client with broadcaster, returning an SSE response body.
+    pub async fn new_client(&self) -> Sse<ChannelStream> {
+        println!("starting creation");
+        let (tx, rx) = sse::channel(10);
+
+        tx.send(sse::Data::new("connected")).await.unwrap();
+        println!("creating new clients success {:?}", tx);
+        self.inner.lock().clients.push(tx);
+        rx
+    }
+
+    /// Broadcasts `msg` to all clients.
+    pub async fn broadcast(&self, msg: &str) {
+        let clients = self.inner.lock().clients.clone();
+
+        let send_futures = clients
+            .iter()
+            .map(|client| client.send(sse::Data::new(msg)));
+
+        // try to send to all clients, ignoring failures
+        // disconnected clients will get swept up by `remove_stale_clients`
+        let _ = future::join_all(send_futures).await;
+    }
+}
+EOM
+
+cd ..
+
+sudo yum groupinstall -y 'Development Tools'
+curl https://sh.rustup.rs -sSf | sh -s -- -y # no confirm
+# curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+######### create and run application
+
+
+######### backend application service
+cd /etc/systemd/system
+cat > $FILE_BACKEND_SERVICE <<- EOM
+[Unit]
+Description=Backend service
+After=syslog.target network.target
+[Service]
+SuccessExitStatus=143
+User=ssm-user
+Group=ssm-user
+
+Type=simple
+
+ExecStart=/opt/apps/backend
+ExecStop=/bin/kill -15 $MAINPID
+
+[Install]
+WantedBy=multi-user.target
+EOM
+
+cd /opt/apps
+cat > $FILE_BACKEND_EXEC <<- EOM
+#!/bin/bash
+
+WORKDIR=/opt/apps/backend-src
+cd $WORKDIR
+$HOME/.cargo/bin/cargo run
+EOM
+
+sudo chmod 777 $FILE_BACKEND_EXEC
+######### backend application service
+
+
+######### run backend
+sudo systemctl daemon-reload
+sudo systemctl start backend.service
+sudo systemctl status backend.service
+sudo systemctl enable backend.service
+######### run backend
+
