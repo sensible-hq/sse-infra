@@ -11,9 +11,8 @@ FILE_BACKEND_EXEC="./backend"
 
 
 # directory for application
-sudo yum update
-sudo mkdir /opt/apps
-sudo chown -R ssm-user:ssm-user /opt/apps
+yum update -y
+mkdir /opt/apps
 cd /opt/apps
 
 ######### create and run application
@@ -32,6 +31,7 @@ actix-web = { version = "4.4" }
 actix-web-lab = { version = "0.18" }
 parking_lot = { version = "0.12" }
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
+chrono = "0.4.34"
 EOM
 
 
@@ -87,11 +87,12 @@ EOM
 
 
 cat > $FILE_BROADCAST_RS <<- EOM
-use std::{sync::Arc, time::Duration};
 use actix_web::rt::time::interval;
 use actix_web_lab::sse::{self, ChannelStream, Sse};
+use chrono::{DateTime, Utc};
 use futures_util::future;
 use parking_lot::Mutex;
+use std::{sync::Arc, time::Duration};
 
 pub struct Broadcaster {
     inner: Mutex<BroadcasterInner>,
@@ -99,7 +100,7 @@ pub struct Broadcaster {
 
 #[derive(Debug, Clone, Default)]
 struct BroadcasterInner {
-    clients: Vec<sse::Sender>,
+    clients: Vec<(sse::Sender, DateTime<Utc>)>,
 }
 
 impl Broadcaster {
@@ -136,8 +137,18 @@ impl Broadcaster {
         println!("okay active client {:?}", ok_clients);
 
         for client in clients {
+            let now = Utc::now();
             if client
-                .send(sse::Event::Comment("ping".into()))
+                .0
+                .send(sse::Event::Comment(
+                    format!(
+                        "ping! You are connected for {} minutes and {} seconds. Hostname: {}",
+                        (now - client.1).num_minutes(),
+                        (now - client.1).num_seconds(),
+                        "$(hostname -f)"
+                    )
+                    .into(),
+                ))
                 .await
                 .is_ok()
             {
@@ -153,22 +164,22 @@ impl Broadcaster {
         println!("starting creation");
         let (tx, rx) = sse::channel(10);
 
-        tx.send(sse::Data::new("connected")).await.unwrap();
+        tx.send(sse::Data::new("connected to $(hostname -f)")).await.unwrap();
         println!("creating new clients success {:?}", tx);
-        self.inner.lock().clients.push(tx);
+        self.inner.lock().clients.push((tx, Utc::now()));
         rx
     }
 
-    /// Broadcasts `msg` to all clients.
+    /// Broadcasts msg to all clients.
     pub async fn broadcast(&self, msg: &str) {
         let clients = self.inner.lock().clients.clone();
 
         let send_futures = clients
             .iter()
-            .map(|client| client.send(sse::Data::new(msg)));
+            .map(|client| client.0.send(sse::Data::new(msg)));
 
         // try to send to all clients, ignoring failures
-        // disconnected clients will get swept up by `remove_stale_clients`
+        // disconnected clients will get swept up by remove_stale_clients
         let _ = future::join_all(send_futures).await;
     }
 }
@@ -208,18 +219,20 @@ cat > $FILE_BACKEND_EXEC <<- EOM
 #!/bin/bash
 
 WORKDIR=/opt/apps/backend-src
-cd $WORKDIR
+cd \$WORKDIR
 $HOME/.cargo/bin/cargo run
 EOM
 
-sudo chmod 777 $FILE_BACKEND_EXEC
+chmod 777 $FILE_BACKEND_EXEC
+
+chown -R ssm-user:ssm-user /opt/apps
 ######### backend application service
 
 
 ######### run backend
-sudo systemctl daemon-reload
-sudo systemctl start backend.service
-sudo systemctl status backend.service
-sudo systemctl enable backend.service
+systemctl daemon-reload
+systemctl start backend.service
+systemctl status backend.service
+systemctl enable backend.service
 ######### run backend
 

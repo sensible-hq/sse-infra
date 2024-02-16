@@ -1,8 +1,9 @@
-use std::{sync::Arc, time::Duration};
 use actix_web::rt::time::interval;
 use actix_web_lab::sse::{self, ChannelStream, Sse};
+use chrono::{DateTime, Utc};
 use futures_util::future;
 use parking_lot::Mutex;
+use std::{sync::Arc, time::Duration};
 
 pub struct Broadcaster {
     inner: Mutex<BroadcasterInner>,
@@ -10,7 +11,7 @@ pub struct Broadcaster {
 
 #[derive(Debug, Clone, Default)]
 struct BroadcasterInner {
-    clients: Vec<sse::Sender>,
+    clients: Vec<(sse::Sender, DateTime<Utc>)>,
 }
 
 impl Broadcaster {
@@ -47,8 +48,17 @@ impl Broadcaster {
         println!("okay active client {:?}", ok_clients);
 
         for client in clients {
+            let now = Utc::now();
             if client
-                .send(sse::Event::Comment("ping".into()))
+                .0
+                .send(sse::Event::Comment(
+                    format!(
+                        "ping! You are connected for {} minutes and {} seconds",
+                        (now - client.1).num_minutes(),
+                        (now - client.1).num_seconds()
+                    )
+                    .into(),
+                ))
                 .await
                 .is_ok()
             {
@@ -66,7 +76,7 @@ impl Broadcaster {
 
         tx.send(sse::Data::new("connected")).await.unwrap();
         println!("creating new clients success {:?}", tx);
-        self.inner.lock().clients.push(tx);
+        self.inner.lock().clients.push((tx, Utc::now()));
         rx
     }
 
@@ -76,7 +86,7 @@ impl Broadcaster {
 
         let send_futures = clients
             .iter()
-            .map(|client| client.send(sse::Data::new(msg)));
+            .map(|client| client.0.send(sse::Data::new(msg)));
 
         // try to send to all clients, ignoring failures
         // disconnected clients will get swept up by `remove_stale_clients`
