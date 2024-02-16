@@ -49,13 +49,16 @@ impl Broadcaster {
 
         for client in clients {
             let now = Utc::now();
+            let diff = (now - client.1).num_seconds();
+            let diff_minutes = diff / 60;
+            let diff_seconds = diff % 60;
+
             if client
                 .0
                 .send(sse::Event::Comment(
                     format!(
                         "ping! You are connected for {} minutes and {} seconds",
-                        (now - client.1).num_minutes(),
-                        (now - client.1).num_seconds()
+                        diff_minutes, diff_seconds
                     )
                     .into(),
                 ))
