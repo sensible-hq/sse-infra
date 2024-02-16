@@ -8,6 +8,7 @@ FILE_IPTABLES_SERVICE="./iptableset.service"
 FILE_IPTABLES_EXEC="./iptableset"
 FILE_BACKEND_SERVICE="./backend.service"
 FILE_BACKEND_EXEC="./backend"
+HOME="/root"
 
 
 # directory for application
@@ -193,7 +194,7 @@ cd ..
 sudo yum groupinstall -y 'Development Tools'
 curl https://sh.rustup.rs -sSf | sh -s -- -y # no confirm
 # curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-# source "$HOME/.cargo/env"
+source "$HOME/.cargo/env"
 ######### create and run application
 
 
@@ -205,8 +206,8 @@ Description=Backend service
 After=syslog.target network.target
 [Service]
 SuccessExitStatus=143
-User=ssm-user
-Group=ssm-user
+User=root
+Group=root
 
 Type=simple
 
@@ -227,8 +228,6 @@ $HOME/.cargo/bin/cargo run
 EOM
 
 chmod 777 $FILE_BACKEND_EXEC
-
-chown -R ssm-user:ssm-user /opt/apps
 ######### backend application service
 
 
