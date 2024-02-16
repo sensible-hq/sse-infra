@@ -49,7 +49,7 @@ resource "aws_lb_target_group" "alb_tg" {
 }
 
 resource "aws_lb_target_group_attachment" "alb_tg_attachment" {
-  count = 2
+  count            = 2
   target_group_arn = aws_lb_target_group.alb_tg.arn
   target_id        = aws_instance.ec2[count.index].id
   port             = 8000

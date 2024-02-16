@@ -57,7 +57,6 @@ resource "aws_security_group" "sg_vpc" {
     protocol        = "tcp"
     security_groups = [aws_security_group.sg_alb.id]
   }
-  # TODO
   ingress {
     from_port   = 8000
     to_port     = 8000
