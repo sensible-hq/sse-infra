@@ -2,12 +2,14 @@ resource "aws_instance" "ec2" {
   ami           = "ami-03cceb19496c25679"
   instance_type = "t2.micro" # TODO
 
+  count = 2
+
   vpc_security_group_ids = [aws_security_group.sg_vpc.id]
-  subnet_id              = aws_subnet.public_subnet[0].id
+  subnet_id              = aws_subnet.public_subnet[count.index].id
   iam_instance_profile   = aws_iam_instance_profile.instance_profile.name
 
   tags = {
-    Name = "sensible-test"
+    Name = "sensible-test-${count.index}"
   }
 
   user_data = file("ec2_init.sh")
