@@ -57,8 +57,8 @@ impl Broadcaster {
                 .0
                 .send(sse::Event::Comment(
                     format!(
-                        "ping! You are connected for {} minutes and {} seconds",
-                        diff_minutes, diff_seconds
+                        "ping! You are connected for {}m:{}s (total {}s)",
+                        diff_minutes, diff_seconds, diff
                     )
                     .into(),
                 ))

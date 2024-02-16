@@ -146,8 +146,8 @@ impl Broadcaster {
                 .0
                 .send(sse::Event::Comment(
                     format!(
-                        "ping! You are connected for {} minutes and {} seconds. Hostname: {}",
-                        diff_minutes, diff_seconds,
+                        "ping! You are connected for {}m:{}s (total {}s) Hostname: {}",
+                        diff_minutes, diff_seconds, diff,
                         "$(hostname -f)"
                     )
                     .into(),
