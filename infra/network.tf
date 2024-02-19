@@ -3,6 +3,11 @@ variable "public_subnet_cidrs" {
   description = "Public Subnet CIDR values"
   default     = ["10.0.1.0/24", "10.0.2.0/24"]
 }
+variable "public_subnet_azs" {
+  type        = list(string)
+  description = "Public Subnet Availability Zones"
+  default     = ["eu-central-1a", "eu-central-1b"]
+}
 
 resource "aws_vpc" "vpc" {
   cidr_block = "10.0.0.0/16"
@@ -16,8 +21,9 @@ resource "aws_subnet" "public_subnet" {
   vpc_id                  = aws_vpc.vpc.id
   map_public_ip_on_launch = true
 
-  count      = length(var.public_subnet_cidrs)
-  cidr_block = element(var.public_subnet_cidrs, count.index)
+  count             = length(var.public_subnet_cidrs)
+  cidr_block        = element(var.public_subnet_cidrs, count.index)
+  availability_zone = element(var.public_subnet_azs, count.index)
 }
 
 resource "aws_internet_gateway" "ig" {
