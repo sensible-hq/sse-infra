@@ -26,7 +26,7 @@ pub async fn broadcast_msg(
     HttpResponse::Ok().body("msg sent")
 }
 
-async fn alb_test() -> impl Responder {
+async fn health_check() -> impl Responder {
     HttpResponse::Ok().body("OK")
 }
 
@@ -41,7 +41,7 @@ async fn main() -> std::io::Result<()> {
             }))
             .route("/events{_:/?}", web::get().to(sse_client))
             .route("/events/{msg}", web::get().to(broadcast_msg))
-            .route("/alb-test", web::get().to(alb_test))
+            .route("/health-check", web::get().to(health_check))
     })
     .bind(format!("{}:{}", "0.0.0.0", "8000"))?
     .run()
