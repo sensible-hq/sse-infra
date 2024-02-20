@@ -2,7 +2,7 @@ resource "aws_vpc" "vpc" {
   cidr_block = var.vpc_cidr
 
   tags = {
-    Name = "sensible-vpc"
+    Name = "${var.stage}-vpc"
   }
 }
 
@@ -19,7 +19,7 @@ resource "aws_subnet" "public_subnet" {
 resource "aws_internet_gateway" "ig" {
   vpc_id = aws_vpc.vpc.id
   tags = {
-    Name = "sensible-ig"
+    Name = "${var.stage}-ig"
   }
 }
 
@@ -32,7 +32,7 @@ resource "aws_route_table" "route" {
   }
 }
 
-resource "aws_route_table_association" "public_1" {
+resource "aws_route_table_association" "association" {
   count = length(var.public_subnet_cidrs)
 
   subnet_id      = aws_subnet.public_subnet[count.index].id

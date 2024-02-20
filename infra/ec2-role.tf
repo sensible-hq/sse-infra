@@ -10,17 +10,17 @@ data "aws_iam_policy_document" "instance_assume_role_policy" {
 }
 
 resource "aws_iam_role" "instance_role" {
-  name               = "instance-role"
+  name               = "${var.stage}-instance-role"
   assume_role_policy = data.aws_iam_policy_document.instance_assume_role_policy.json
 }
 
 resource "aws_iam_instance_profile" "instance_profile" {
-  name = "instance-profile"
+  name = "${var.stage}-instance-profile"
   role = aws_iam_role.instance_role.name
 }
 
 resource "aws_iam_policy" "instance_policy" {
-  name = "instance-policy"
+  name = "${var.stage}-instance-policy"
 
   policy = jsonencode({
     Version = "2012-10-17"
