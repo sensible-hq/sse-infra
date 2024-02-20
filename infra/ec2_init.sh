@@ -4,8 +4,6 @@
 FILE_MAIN_RS="./main.rs"
 FILE_BROADCAST_RS="./broadcast.rs"
 FILE_CARGO_TOML="./Cargo.toml"
-FILE_IPTABLES_SERVICE="./iptableset.service"
-FILE_IPTABLES_EXEC="./iptableset"
 FILE_BACKEND_SERVICE="./backend.service"
 FILE_BACKEND_EXEC="./backend"
 HOME="/root"
