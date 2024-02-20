@@ -1,11 +1,6 @@
 terraform {
 
-  backend "s3" {
-    bucket  = "io.snapsoft-sensible-test-bucket-matyas"
-    key     = "sensible-infra/terraform.tfstate"
-    region  = "eu-central-1"
-    encrypt = true
-  }
+  backend "s3" {}
 
   required_providers {
     aws = {
