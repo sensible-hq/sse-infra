@@ -8,6 +8,11 @@ variable "aws_account_id" {
   description = "The used AWS account id"
 }
 
+variable "aws_region" {
+  type        = string
+  description = "The used AWS account id"
+}
+
 variable "vpc_cidr" {
   type        = string
   description = "CIDR block of VPC"

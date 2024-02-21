@@ -1,5 +1,5 @@
 module "alb" {
-  source = "./alb"
+  source = "./module/alb"
 
   stage                         = var.stage
   load_balancer_port            = var.load_balancer_port

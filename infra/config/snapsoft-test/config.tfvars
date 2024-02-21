@@ -1,5 +1,6 @@
 # snapsoft-test
 stage                         = "snapsoft-test"
+aws_region                    = "eu-central-1"
 aws_account_id                = "100139537474"
 vpc_cidr                      = "10.0.0.0/16"
 public_subnet_cidrs           = ["10.0.1.0/24", "10.0.2.0/24"]
